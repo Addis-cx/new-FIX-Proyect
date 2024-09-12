@@ -65,6 +65,7 @@ class ProductController extends Controller
                 [
                     'variant' => [
                         'sku' => "$SKU-$size",
+                        'stock' => $this->getStock($SKU,$size),
                         'options' => [
                             [
                                 'name' => 'talla',
@@ -92,24 +93,24 @@ class ProductController extends Controller
         }
     }
 
-    private function getStock() {
+    public function getStock($sku="8734-768-23580-34576", $size="34") {
         try {
-            $totalStock = [];
+            $totalStock = 0;
             $stocks = Http::get('https://induccion.fixlabsdev.com/api/products/stock');
             if ($stocks->failed()) {
                 throw new Exception('Error en la consulta');
             }
             $stockData = $stocks->json();
             foreach ($stockData as $product) {
-                foreach ($product as $warehouses) {
-                    foreach ($warehouses as $warehouse) {
-                        foreach ($warehouse['variants'] as $variants) {
-                            $sku = $variants['sku'];
-                            $stock = $variants['stock'];
-                            if (!isset($totalStock[$sku])) {
-                                $totalStock[$sku] = 0;
-                            }
-                            $totalStock[$sku] += $stock;
+                if (isset($product[$sku])) {
+                   foreach ($product as $warehouses) {
+                       foreach ($warehouses as $warehouse) {
+                           foreach ($warehouse['variants'] as $variants) {
+                               $result = "$sku-$size";
+                                if ($variants['sku'] === $result) {
+                                $totalStock += $variants['stock'];
+                                }
+                           }
                         }
                     }
                 }
@@ -123,12 +124,10 @@ class ProductController extends Controller
         }
     }
 
-
     public function store() {
         try {
             $result = [];
             $variants = [];
-            $stocks[] = $this->getStock();
             $products = Http::get('https://induccion.fixlabsdev.com/api/products');
             if (!$products) {
                 throw new Exception('no pudo obtener productos');
@@ -143,7 +142,6 @@ class ProductController extends Controller
             $data = [
                 'products' => $result,
                 'variants' => $variants,
-                'stocks' => $stocks,
                 'status' => 201
             ];
             return response()->json($data, 201);
